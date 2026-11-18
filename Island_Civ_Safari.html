@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#14251e">
+<title>Island Civ — Eilandbeschaving</title>
+<style>
+:root{color-scheme:dark;--bg:#101b18;--panel:#1b2c25;--line:#385447;--gold:#f0c96b;--muted:#b7c8bd}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#f3f5ed;font:15px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:env(safe-area-inset-top) 12px env(safe-area-inset-bottom)}
+main{max-width:760px;margin:auto;padding:12px 0 28px}h1{font-size:23px;margin:5px 0}p{color:var(--muted);line-height:1.4;margin:6px 0 12px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin:12px 0}.stat,.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px}.stat small{display:block;color:var(--muted);font-size:11px}.stat b{font-size:18px}
+canvas{display:block;width:100%;height:auto;aspect-ratio:1.25;background:#315b47;border-radius:13px;border:2px solid var(--line);image-rendering:pixelated;touch-action:pan-y}
+.panel{margin-top:11px}.row{display:flex;gap:8px;flex-wrap:wrap}.row>*{flex:1}
+button{border:1px solid #64816e;background:#304c3d;color:white;border-radius:10px;padding:12px 10px;font-size:14px;font-weight:650;min-height:44px;cursor:pointer;touch-action:manipulation}
+button.primary{background:#98722e;border-color:#d7b45d;color:#fff8df}button:active{transform:scale(.98);filter:brightness(1.2)}
+input{width:100%;background:#101b18;color:white;border:1px solid #587364;border-radius:9px;padding:13px;font-size:16px;min-height:46px;margin:6px 0}
+#log{max-height:130px;overflow:auto;color:var(--muted);font-size:13px;line-height:1.5}
+#status{color:var(--gold);font-weight:650;min-height:20px}
+footer{font-size:11px;color:#91a79a;text-align:center;margin:14px 0}
+</style>
+</head>
+<body>
+<main>
+<h1>🏝️ Island Civ</h1>
+<p>Bouw een eilandbeschaving. Geef je bewoners opdrachten en kijk hoe hun samenleving groeit.</p>
+<div class="stats">
+ <div class="stat"><small>JAAR</small><b id="year">1</b></div>
+ <div class="stat"><small>INWONERS</small><b id="pop">8</b></div>
+ <div class="stat"><small>VOEDSEL</small><b id="food">24</b></div>
+ <div class="stat"><small>HOUT</small><b id="wood">12</b></div>
+</div>
+<canvas id="world" width="500" height="400" aria-label="Pixel-art eiland"></canvas>
+<div class="panel">
+ <div id="status">Je nederzetting is begonnen.</div>
+ <div class="row" style="margin-top:8px">
+  <button class="primary" id="yearBtn">▶ Volgend jaar</button>
+  <button id="tenBtn">⏩ 10 jaar</button>
+  <button id="autoBtn">▶ Automatisch: uit</button>
+ </div>
+</div>
+<div class="panel">
+ <b>🧠 Geef je beschaving een opdracht</b>
+ <input id="command" type="text" maxlength="140" placeholder="Bijv. Bouw een groot koninkrijk en verbouw voedsel">
+ <div class="row"><button class="primary" id="sendBtn">Opdracht uitvoeren</button><button id="resetBtn">Nieuw eiland</button></div>
+ <p style="font-size:12px;margin-bottom:0">De lokale spel-AI vertaalt je opdracht naar prioriteiten (landbouw, bouwen, handel of kennis).</p>
+</div>
+<div class="panel">
+ <b>📜 Kroniek van het eiland</b>
+ <div id="log" aria-live="polite">Jaar 1: Acht bewoners vestigen zich aan de kust.</div>
+</div>
+<footer>Island Civ · Speelbaar prototype · Werkt lokaal in Safari; geen account nodig.</footer>
+</main>
+<script>
+(()=>{
+"use strict";
+const $=id=>document.getElementById(id);
+const canvas=$("world"),ctx=canvas.getContext("2d");
+let s,autoTimer=null, directive="balanced", buildings=[];
+function fresh(){s={year:1,pop:8,food:24,wood:12,stone:5,houses:2,farms:1,knowledge:0,happiness:70};buildings=[];for(let i=0;i<s.houses;i++)buildings.push({type:"house",x:190+i*35,y:205});buildings.push({type:"farm",x:260,y:250});log("Jaar 1: Acht bewoners vestigen zich aan de kust.");update();draw();$("status").textContent="Je nederzetting is begonnen."}
+function log(t){const el=$("log");el.innerHTML=t+"<br>"+el.innerHTML}
+function update(){ $("year").textContent=s.year;$("pop").textContent=s.pop;$("food").textContent=Math.floor(s.food);$("wood").textContent=Math.floor(s.wood)}
+function draw(){
+ const w=500,h=400;ctx.clearRect(0,0,w,h);
+ ctx.fillStyle="#244e68";ctx.fillRect(0,0,w,h);
+ // water pixels
+ for(let y=0;y<h;y+=16)for(let x=0;x<w;x+=16){ctx.fillStyle=((x+y)/16)%3===0?"#2a5870":"#28536b";ctx.fillRect(x,y,16,16)}
+ // island silhouette
+ ctx.fillStyle="#b9a66a";ctx.beginPath();ctx.moveTo(62,198);ctx.lineTo(92,112);ctx.lineTo(176,65);ctx.lineTo(300,75);ctx.lineTo(412,145);ctx.lineTo(438,245);ctx.lineTo(360,322);ctx.lineTo(220,350);ctx.lineTo(100,300);ctx.closePath();ctx.fill();
+ ctx.fillStyle="#5c9b58";ctx.beginPath();ctx.moveTo(80,195);ctx.lineTo(111,126);ctx.lineTo(184,82);ctx.lineTo(296,91);ctx.lineTo(393,151);ctx.lineTo(418,239);ctx.lineTo(348,304);ctx.lineTo(220,330);ctx.lineTo(116,284);ctx.closePath();ctx.fill();
+ // trees
+ for(let i=0;i<18;i++){let x=105+(i*67%285),y=115+(i*43%180);if((x-250)**2/18000+(y-210)**2/13000<1){ctx.fillStyle="#285d3c";ctx.fillRect(x,y,12,15);ctx.fillStyle="#347b48";ctx.fillRect(x-5,y-8,22,17)}}
+ // buildings
+ buildings.forEach(b=>{if(b.type==="house"){ctx.fillStyle="#d9c18a";ctx.fillRect(b.x,b.y,25,20);ctx.fillStyle="#874d37";ctx.beginPath();ctx.moveTo(b.x-4,b.y);ctx.lineTo(b.x+12,b.y-13);ctx.lineTo(b.x+29,b.y);ctx.fill();ctx.fillStyle="#553c2b";ctx.fillRect(b.x+10,b.y+9,6,11)}else if(b.type==="farm"){ctx.fillStyle="#a17a3e";ctx.fillRect(b.x,b.y,35,23);ctx.strokeStyle="#e1c16d";for(let i=5;i<35;i+=8){ctx.beginPath();ctx.moveTo(b.x+i,b.y+2);ctx.lineTo(b.x+i,b.y+21);ctx.stroke()}}else{ctx.fillStyle="#b8b9a8";ctx.fillRect(b.x,b.y,28,25);ctx.fillStyle="#8d4935";ctx.fillRect(b.x+7,b.y-10,14,10)}});
+ // people
+ for(let i=0;i<Math.min(s.pop,24);i++){let x=165+(i*31%190),y=185+(i*19%95);ctx.fillStyle="#f0c99a";ctx.fillRect(x,y,6,6);ctx.fillStyle="#385c9b";ctx.fillRect(x,y+6,6,8)}
+ ctx.fillStyle="#fff";ctx.font="bold 13px sans-serif";ctx.fillText("JOUW EILAND",16,24);
+}
+function step(){
+ s.year++;
+ let farmers=Math.max(1,Math.floor(s.pop*(directive==="farm"?0.42:0.28)));
+ let builders=Math.max(1,Math.floor(s.pop*(directive==="build"?0.3:0.16)));
+ s.food+=farmers*2.1+s.farms*1.2-s.pop*1.25;
+ s.wood+=Math.max(0,s.pop-farmers-builders)*0.8;
+ if(directive==="knowledge")s.knowledge+=2;
+ if(directive==="trade")s.food+=2;
+ if(s.food<0){s.pop=Math.max(2,s.pop-1);s.food=0;log("Jaar "+s.year+": Voedseltekort! Een bewoner vertrekt.");s.happiness-=8}
+ else if(s.food>30&&s.pop<35&&s.year%3===0){s.pop++;s.food-=3;log("Jaar "+s.year+": Een nieuwe bewoner sluit zich aan bij de nederzetting.")}
+ if(directive==="build"&&s.wood>=7&&s.houses<10&&s.year%2===0){s.wood-=7;s.houses++;buildings.push({type:"house",x:145+(s.houses*39%210),y:205+(s.houses%3)*26});log("Jaar "+s.year+": Er is een nieuw huis gebouwd.")}
+ if(directive==="farm"&&s.wood>=5&&s.farms<8&&s.year%3===0){s.wood-=5;s.farms++;buildings.push({type:"farm",x:270+(s.farms%3)*35,y:260+(s.farms%2)*25});log("Jaar "+s.year+": Nieuwe landbouwgrond verhoogt de voedselproductie.")}
+ if(s.year%7===0){s.happiness=Math.min(100,s.happiness+2);log("Jaar "+s.year+": Het dorp houdt een oogstfeest. De stemming verbetert.")}
+ if(s.year%11===0&&Math.random()<.35){s.food=Math.max(0,s.food-8);log("Jaar "+s.year+": Een storm beschadigt de oogst.")}
+ $("status").textContent=directive==="balanced"?"De bewoners verdelen hun werk evenwichtig.":"Beleid: "+({farm:"focus op landbouw",build:"focus op bouwen",trade:"focus op handel",knowledge:"focus op kennis"}[directive]);
+ update();draw();
+}
+function run(n){for(let i=0;i<n;i++)step()}
+function applyCommand(){let t=$("command").value.trim().toLowerCase();if(!t){$("status").textContent="Typ eerst een opdracht.";return}
+ if(/boer|landbouw|voedsel|oogst|akker/.test(t))directive="farm";
+ else if(/bouw|huis|stad|koninkrijk|dorp|kasteel/.test(t))directive="build";
+ else if(/handel|ruil|markt|rijkdom/.test(t))directive="trade";
+ else if(/kennis|school|onderzoek|wetenschap/.test(t))directive="knowledge";
+ else directive="balanced";
+ log("Opdracht: “"+$("command").value.trim()+"” — de raad kiest "+directive+".");
+ $("status").textContent="De raad heeft je opdracht verwerkt."; $("command").value="";
+}
+$("yearBtn").addEventListener("click",()=>run(1));
+$("tenBtn").addEventListener("click",()=>run(10));
+$("sendBtn").addEventListener("click",applyCommand);
+$("command").addEventListener("keydown",e=>{if(e.key==="Enter")applyCommand()});
+$("resetBtn").addEventListener("click",()=>{if(autoTimer){clearInterval(autoTimer);autoTimer=null;$("autoBtn").textContent="▶ Automatisch: uit"}fresh()});
+$("autoBtn").addEventListener("click",()=>{if(autoTimer){clearInterval(autoTimer);autoTimer=null;$("autoBtn").textContent="▶ Automatisch: uit"}else{autoTimer=setInterval(()=>run(1),1100);$("autoBtn").textContent="⏸ Automatisch: aan"}});
+fresh();
+})();
+</script>
+</body></html>
